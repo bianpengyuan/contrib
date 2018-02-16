@@ -38,13 +38,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/googleapis/googleapis"
-  packages = ["google/rpc"]
-  revision = "5c1723a756d1dc7086301d58df80fa673203fbd2"
-  source = "https://github.com/costinm/googleapis.git"
-
-[[projects]]
-  branch = "master"
   name = "github.com/hashicorp/errwrap"
   packages = ["."]
   revision = "7554cd9344cec97297fa6649b055a8c98c2a1e55"
@@ -57,8 +50,17 @@
 
 [[projects]]
   name = "istio.io/api"
-  packages = ["mixer/v1/template"]
-  revision = "a6c74ca9a8b5bba45bafd6d238a27dde4c406da7"
+  packages = [
+    "mixer/v1/config/descriptor",
+    "mixer/v1/template"
+  ]
+  revision = "87a9d695c8a65f11db006a9108904934c6c9caeb"
+
+[[projects]]
+  branch = "master"
+  name = "istio.io/gogo-genproto"
+  packages = ["googleapis/google/rpc"]
+  revision = "dd2b5b6a8f1400838165245e704a011a30154a44"
 
 [[projects]]
   name = "istio.io/istio"
@@ -69,12 +71,12 @@
     "mixer/template/checknothing",
     "mixer/template/reportnothing"
   ]
-  revision = "4ea861ef32f5641094f600e61c1ff9346a612196"
-  version = "0.4.0"
+  revision = "30acfe6528107ea333543309095659b93364b30d"
+  version = "0.5.1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ae2073b10e92cbbd1aca1ecf24fd5f07aade3ec04c6c0ab07e0702047d9366b6"
+  inputs-digest = "b32659711c7ae9fa5dd57370b710d14b24316a239c9c6560ff82e1b8ce7da759"
   solver-name = "gps-cdcl"
   solver-version = 1
