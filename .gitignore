@@ -6,3 +6,6 @@ bin/protoc-*
 
 # ignore IDE files
 .idea/
+
+adapters/stackdriver/cmd/stackdriveradapter
+adapters/stackdriver/.rc.mk

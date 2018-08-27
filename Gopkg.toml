@@ -8,6 +8,15 @@ required = [
   "github.com/gogo/protobuf/gogoproto",
 ]
 
+ignored = [
+  # Context Graph depends on a locally vendored library that isn't (yet) available upstream.
+  "istio.io/contrib/adapters/stackdriver/contextgraph",
+]
+
 [[override]]
-  name = "github.com/gogo/protobuf"
-  version = "=0.5"
+  name = "istio.io/istio"
+  branch = "master"
+
+[[constraint]]
+branch = "master"
+name = "google.golang.org/genproto"

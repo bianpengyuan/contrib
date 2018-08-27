@@ -1,0 +1,202 @@
+apiVersion: "config.istio.io/v1alpha2"
+kind: handler
+metadata:
+  name: stackdriver
+  namespace: istio-system
+spec:
+  adapter: stackdriver.istio-system
+  connection:
+    address: "stackdriveradapter:8080"
+  params:
+    # We'll use the default value from the adapter, once per minute, so we don't need to supply a value.
+    # pushInterval: 1m
+    # Must be supplied for the stackdriver adapter to work
+    project_id: <project_id>
+    # One of the following must be set; the preferred method is `appCredentials`, which corresponds to
+    # Google Application Default Credentials. See:
+    #    https://developers.google.com/identity/protocols/application-default-credentials
+    # If none is provided we default to app credentials.
+    # appCredentials:
+    # apiKey:
+    # serviceAccountPath:
+
+    # Describes how to map Istio metrics into Stackdriver.
+    # Note: most of this config is copied over from prometheus.yaml to keep our metrics consistent across backends
+    metricInfo:
+      stackdriverrequestcountoop.instance.istio-system:
+        # Due to a bug in gogoproto deserialization, Enums in maps must be
+        # specified by their integer value, not variant name. See
+        # https://github.com/googleapis/googleapis/blob/master/google/api/metric.proto
+        # MetricKind and ValueType for the values to provide.
+        kind: CUMULATIVE
+        value: INT64
+    logInfo:
+      stackdriverlog.instance.istio-system:
+        payloadTemplate: '{{or (.sourceIp) "-"}} - {{or (.sourceUser) "-"}} [{{or (.timestamp.Format "02/Jan/2006:15:04:05 -0700") "-"}}] "{{or (.method) "-"}} {{or (.url) "-"}} {{or (.protocol) "-"}}" {{or (.responseCode) "-"}} {{or (.responseSize) "-"}}'
+        httpMapping:
+          url: url
+          status: responseCode
+          requestSize: requestSize
+          responseSize: responseSize
+          latency: latency
+          localIp: sourceIp
+          remoteIp: destinationIp
+          method: method
+          userAgent: userAgent
+          referer: referer
+        labelNames:
+        - originIp
+        - sourceIp
+        - destinationIp
+        - sourceService
+        - sourceUser
+        - sourceNamespace
+        - destinationIp
+        - destinationService
+        - destinationNamespace
+        - apiName
+        - apiVersion
+        - apiClaims
+        - apiKey
+        - requestOperation
+        - protocol
+        - method
+        - url
+        - responseCode
+        - responseSize
+        - requestSize
+        - latency
+        - connectionMtls
+        - userAgent
+        - responseTimestamp
+        - receivedBytes
+        - sentBytes
+        - referer
+    trace:
+      sample_probability: 1.0
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: stackdriver
+  namespace: istio-system
+spec:
+  match: "true" # If omitted match is true.
+  actions:
+  - handler: stackdriver.handler
+    instances:
+    - stackdriverrequestcountoop
+    - stackdriverspan
+    - stackdriverlog
+---
+# Note, we're trying to keep the following metric definitions in line with metrics.yaml - we add extra here to handle
+# populating monitored resource values.
+apiVersion: "config.istio.io/v1alpha2"
+kind: instance
+metadata:
+  name: stackdriverrequestcountoop
+  namespace: istio-system
+spec:
+  template: metric
+  params:
+    value: "1"
+    dimensions:
+      destination_service_name: destination.service.name | "unknown"
+      destination_service_namespace: destination.service.namespace | "unknown"
+      destination_port: destination.port | 0
+      request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+      request_protocol: context.protocol | "unknown"
+      response_code: response.code | 0
+      source_workload_name: source.workload.name | "unknown"
+      source_owner: source.owner | "unknown"
+      destination_workload_name: destination.workload.name | "unknown"
+      destination_owner: destination.owner | "unknown"
+    monitoredResourceType: '"global"'
+    monitoredResourceDimensions:
+      # When using the global MR, this must be filled in, preferably matching the
+      # project_id given above in stackdriver config.
+      project_id: '"<project_id>"'
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: instance
+metadata:
+  name: stackdriverspan
+  namespace: istio-system
+spec:
+  template: tracespan
+  params:
+    traceId: request.headers["x-b3-traceid"]
+    spanId: request.headers["x-b3-spanid"] | ""
+    parentSpanId: request.headers["x-b3-parentspanid"] | ""
+    spanName: destination.service.host | destination.service.name | destination.workload.name | "unknown"
+    startTime: request.time
+    endTime: response.time
+    clientSpan: (context.reporter.kind | "inbound") == "outbound"
+    rewriteClientSpanId: "true"
+    spanTags:
+      destination_service_name: destination.service.name | "unknown"
+      destination_service_namespace: destination.service.namespace | "unknown"
+      destination_port: destination.port | 0
+      request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+      request_protocol: context.protocol | "unknown"
+      api_version: api.version | "unknown"
+      api_name: api.service | "unknown"
+      response_code: response.code | 0
+      service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+      source_workload_namespace: source.workload.namespace | "unknown"
+      source_workload_name: source.workload.name | "unknown"
+      source_owner: source.owner | "unknown"
+      destination_workload_namespace: destination.workload.namespace | "unknown"
+      destination_workload_name: destination.workload.name | "unknown"
+      destination_owner: destination.owner | "unknown"
+      http_url: request.path | ""
+      request_size: request.size | 0
+      response_size: response.size | 0
+      source_ip: source.ip | ip("0.0.0.0")
+---
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: instance
+metadata:
+  name: stackdriverlog
+  namespace: istio-system
+spec:
+  template: logentry
+  params:
+    severity: '"Info"'
+    timestamp: request.time
+    variables:
+      originIp: origin.ip | ip("0.0.0.0")
+      sourceIp: source.ip | ip("0.0.0.0")
+      sourceService: source.service | ""
+      sourceUser: source.user | source.uid | ""
+      sourceNamespace: source.namespace | ""
+      destinationIp: destination.ip | ip("0.0.0.0")
+      destinationService: destination.service | ""
+      destinationNamespace: destination.namespace | ""
+      apiName: api.service | ""
+      apiVersion: api.version | ""
+      apiClaims: request.headers["sec-istio-auth-userinfo"]| ""
+      apiKey: request.api_key | request.headers["x-api-key"] | ""
+      requestOperation: api.operation | ""
+      protocol: request.scheme | "http"
+      method: request.method | ""
+      url: request.path | ""
+      responseCode: response.code | 0
+      responseSize: response.size | 0
+      requestSize: request.size | 0
+      latency: response.duration | "0ms"
+      connectionMtls: connection.mtls | false
+      userAgent: request.useragent | ""
+      responseTimestamp: response.time
+      receivedBytes: request.total_size | connection.received.bytes | 0
+      sentBytes: response.total_size | connection.sent.bytes | 0
+      referer: request.referer | ""
+    # The Monitored Resource must match a Stackdriver Monitored resource type defined at:
+    #     https://cloud.google.com/monitoring/api/resources
+    # Sending invalid MRs will result in the entire metric entry being rejected.
+    monitoredResourceType: '"global"'
+    monitoredResourceDimensions:
+      # When using the global MR, this must be filled in, preferably matching the
+      # project_id given above in stackdriver config.
+      project_id: '"<project_id>"'
